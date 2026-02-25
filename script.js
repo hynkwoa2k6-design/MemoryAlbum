@@ -7,8 +7,8 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const DRIVE_FOLDER_NAME = "AlbumMemory";
 const ROOT_FOLDER_ID = "16iD_6EcWv2XYTtyiYAJZmHbJX2rFyljO"; // ID thư mục Drive của bạn
 // Optional: public metadata file IDs (make these files "Anyone with the link -> Viewer")
-const PUBLIC_ALBUMS_FILE_ID = "1V610yMBiZIAH76Rrp9KUwv_Q7e-lb_1E"; // e.g. '1AbCd...'
-const PUBLIC_FILES_FILE_ID = "1RNIA3ZZYCS7IbEcIzSkntw5AzH2m_9Y_"; // e.g. '1XyZ...'
+const PUBLIC_ALBUMS_FILE_ID = null; // e.g. '1AbCd...'
+const PUBLIC_FILES_FILE_ID = null; // e.g. '1XyZ...'
 const ALBUMS_DATA_FILE = "albums_data.json";
 const FILES_DATA_FILE = "files_data.json";
 
@@ -561,6 +561,7 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
         document.getElementById('loginError').textContent = '';
         updateAuthUI();
         loadAlbums(); // Reload to show delete buttons
+        // Nếu chưa có public ID, loadAlbums sẽ tự hiện nút Setup cho Admin
         document.getElementById('loginForm').reset();
     } else {
         document.getElementById('loginError').textContent = 'Sai tên đăng nhập hoặc mật khẩu!';
@@ -742,13 +743,27 @@ async function loadAlbums() {
 
         if (!albums || albums.length === 0) {
             if (!driveAccessToken) {
-                albumList.innerHTML = `
-                    <div style="grid-column: 1/-1; text-align: center; color: #999; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                        <p>Chưa kết nối với Google Drive.</p>
-                        <button id="connectDriveBtn" class="btn btn-primary" onclick="connectAndLoad()">🔄 Kết nối Google Drive để tải Album</button>
-                        <p style="font-size: 12px; color: #666;">(Cần cấp quyền để xem ảnh/video của bạn)</p>
-                    </div>
-                `;
+                // Nếu chưa cấu hình ID Public -> Báo cần Setup (Chỉ Admin mới hiểu)
+                if (!PUBLIC_ALBUMS_FILE_ID) {
+                    albumList.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; color: #999; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px;">
+                            <p style="font-size: 18px;">🚧 Website đang thiết lập 🚧</p>
+                            <p style="font-size: 13px; color: #666;">Nếu bạn là Admin, hãy bấm nút "Admin" ở góc trên để đăng nhập và kết nối dữ liệu.</p>
+                            <button id="connectDriveBtn" class="btn btn-primary" onclick="connectAndLoad()" style="display: none;">🔄 Kết nối Google Drive (Setup)</button>
+                        </div>
+                    `;
+                    // Nếu đang ở chế độ Admin thì hiện nút kết nối
+                    if (isAdmin) {
+                        const btn = document.getElementById('connectDriveBtn');
+                        if (btn) {
+                            btn.style.display = 'flex';
+                            btn.innerHTML = '⚙️ Admin Setup: Kết nối Drive lần đầu';
+                        }
+                    }
+                } else {
+                    // Đã cấu hình nhưng không tải được hoặc trống -> Báo lỗi nhẹ
+                    albumList.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999;">Không có album nào để hiển thị.</p>';
+                }
             } else {
                 albumList.innerHTML = `
                     <div style="grid-column: 1/-1; text-align: center; color: #999; display: flex; flex-direction: column; align-items: center; gap: 10px;">
@@ -1413,6 +1428,51 @@ async function uploadFiles() {
 
         uploadStatus.textContent = `✅ Tải lên ${uploadedCount} file thành công!`;
         document.getElementById('newAlbumName').value = '';
+        document.getElementById('selectedFilesPreview').textContent = '';
+
+        setTimeout(() => {
+            uploadStatus.textContent = '';
+            closeUploadModal();
+            if (currentAlbumId) {
+                loadFiles(currentAlbumId);
+            } else {
+                loadAlbums();
+            }
+        }, 1500);
+    } catch (error) {
+        console.error('Upload error details:', error);
+        let msg = error.message;
+
+        if (!msg) {
+            if (error.error === "popup_blocked_by_browser") {
+                msg = "Trình duyệt đã chặn popup. Hãy bật popup cho trang này.";
+            } else if (error.error === "access_denied") {
+                msg = "Bạn đã từ chối cấp quyền truy cập Drive.";
+            } else if (typeof error === 'object') {
+                msg = JSON.stringify(error);
+            } else {
+                msg = "Xác thực Drive thất bại";
+            }
+        }
+
+        document.getElementById('uploadStatus').textContent = '❌ Lỗi: ' + msg;
+    }
+}
+        if (!msg) {
+            if (error.error === "popup_blocked_by_browser") {
+                msg = "Trình duyệt đã chặn popup. Hãy bật popup cho trang này.";
+            } else if (error.error === "access_denied") {
+                msg = "Bạn đã từ chối cấp quyền truy cập Drive.";
+            } else if (typeof error === 'object') {
+                msg = JSON.stringify(error);
+            } else {
+                msg = "Xác thực Drive thất bại";
+            }
+        }
+
+        document.getElementById('uploadStatus').textContent = '❌ Lỗi: ' + msg;
+    }
+}
         document.getElementById('selectedFilesPreview').textContent = '';
 
         setTimeout(() => {
