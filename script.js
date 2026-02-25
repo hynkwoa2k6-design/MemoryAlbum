@@ -3,7 +3,7 @@
 // ============================================
 // TODO: Bạn cần lấy Client ID từ Google Cloud Console để tính năng upload hoạt động
 const GOOGLE_CLIENT_ID = "831264641769-anqogj5ov2mdmarq5in18naunfkspd6a.apps.googleusercontent.com"; 
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const DRIVE_FOLDER_NAME = "AlbumMemory";
 const ROOT_FOLDER_ID = "16iD_6EcWv2XYTtyiYAJZmHbJX2rFyljO"; // ID thư mục Drive của bạn
 // Optional: public metadata file IDs (make these files "Anyone with the link -> Viewer")
@@ -824,6 +824,11 @@ async function syncDriveData() {
         let newFiles = [];
         
         console.log(`Tìm thấy ${folders.length} thư mục.`);
+        
+        if (folders.length === 0) {
+            alert("⚠️ Tìm thấy 0 thư mục!\n\nNguyên nhân: Web chưa có quyền đọc các thư mục cũ của bạn.\n\nCách sửa: Tôi vừa cập nhật quyền trong code. Hãy tải lại trang, bấm 'Kết nối' và CẤP LẠI QUYỀN (Chọn 'Select all' / 'Chọn tất cả').");
+            // Không return để nó vẫn tạo file json rỗng, tránh lỗi code khác
+        }
 
         for (const folder of folders) {
             // 2. Lấy ảnh trong từng thư mục
