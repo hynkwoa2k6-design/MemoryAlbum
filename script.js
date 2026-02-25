@@ -204,10 +204,11 @@ let gapiInited = false;
 let gisInited = false;
 let driveAccessToken = null;
 
-// Helper: Get direct Drive image URL
+// Helper: Get direct Drive image URL (avoid CORS issues)
 function getDriveImageUrl(fileId) {
     if (!fileId) return null;
-    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+    // Use export=download to get direct link
+    return `https://drive.google.com/uc?export=view&id=${fileId}`;
 }
 
 // Update UI based on login state
@@ -337,6 +338,15 @@ async function getDriveToken() {
                     return;
                 }
                 driveAccessToken = resp.access_token;
+                // Make sure gapi.client uses the same access token so subsequent gapi.client
+                // calls (like permissions.create) are authenticated.
+                try {
+                    if (gapi && gapi.client) {
+                        gapi.client.setToken({ access_token: driveAccessToken });
+                    }
+                } catch (e) {
+                    console.warn('Could not set gapi client token:', e);
+                }
                 resolve(resp.access_token);
             };
 
@@ -890,16 +900,41 @@ async function uploadToDrive(file, folderId) {
         throw new Error("Drive upload failed: " + (result.error.message || JSON.stringify(result.error)));
     }
 
-    // Set permission to anyone with link can view
-    await gapi.client.drive.permissions.create({
-        fileId: result.id,
-        resource: {
-            role: 'reader',
-            type: 'anyone'
+    // Set permission to anyone with link can view. Try gapi first, then fallback to REST + fetch.
+    try {
+        if (gapi && gapi.client) {
+            await gapi.client.drive.permissions.create({
+                fileId: result.id,
+                resource: {
+                    role: 'reader',
+                    type: 'anyone'
+                }
+            });
+        } else {
+            throw new Error('gapi.client not available');
         }
-    });
+    } catch (e) {
+        console.warn('gapi permission create failed, falling back to REST call:', e);
+        try {
+            await fetch(`https://www.googleapis.com/drive/v3/files/${result.id}/permissions`, {
+                method: 'POST',
+                headers: {
+                    Authorization: 'Bearer ' + driveAccessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ role: 'reader', type: 'anyone' })
+            });
+        } catch (e2) {
+            console.error('Fallback permission create failed:', e2);
+        }
+    }
 
-    return result;
+    // Normalize returned object with convenient links
+    return {
+        id: result.id,
+        webContentLink: result.webContentLink || `https://drive.google.com/uc?export=view&id=${result.id}`,
+        thumbnailLink: result.thumbnailLink || null
+    };
 }
 
 async function uploadFiles() {
