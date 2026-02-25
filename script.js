@@ -5,6 +5,7 @@
 const GOOGLE_CLIENT_ID = "831264641769-anqogj5ov2mdmarq5in18naunfkspd6a.apps.googleusercontent.com"; 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_FOLDER_NAME = "AlbumMemory";
+const ROOT_FOLDER_ID = "16iD_6EcWv2XYTtyiYAJZmHbJX2rFyljO"; // ID thư mục Drive của bạn
 // Optional: public metadata file IDs (make these files "Anyone with the link -> Viewer")
 const PUBLIC_ALBUMS_FILE_ID = null; // e.g. '1AbCd...'
 const PUBLIC_FILES_FILE_ID = null; // e.g. '1XyZ...'
@@ -70,7 +71,8 @@ const driveStorageManager = {
         }
 
         try {
-            const rootFolderId = await getOrCreateDriveFolder(DRIVE_FOLDER_NAME);
+            // Sử dụng trực tiếp ID thư mục gốc bạn cung cấp
+            const rootFolderId = ROOT_FOLDER_ID;
             
             // Find or create albums_data.json
             const albumsFile = await driveStorageManager.findOrCreateFile(ALBUMS_DATA_FILE, rootFolderId, '[]');
@@ -746,7 +748,13 @@ async function loadAlbums() {
                     </div>
                 `;
             } else {
-                albumList.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999;">Chưa có album nào. Hãy tạo album đầu tiên!</p>';
+                albumList.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; color: #999; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                        <p>Chưa thấy album nào trong dữ liệu.</p>
+                        <p>Nếu bạn đã có ảnh trong thư mục Drive này, hãy nhấn nút dưới để quét lại.</p>
+                        <button id="syncBtn" class="btn btn-secondary" onclick="syncDriveData()">🔄 Quét & Đồng bộ từ Drive</button>
+                    </div>
+                `;
             }
             return;
         }
@@ -794,6 +802,72 @@ async function loadAlbums() {
     } catch (error) {
         console.error('Lỗi khi tải albums:', error);
         albumList.innerHTML = '<p style="color: red;">Lỗi khi tải albums!</p>';
+    }
+}
+
+async function syncDriveData() {
+    if (!driveAccessToken) return;
+    const btn = document.getElementById('syncBtn');
+    if(btn) btn.textContent = '⏳ Đang quét Drive... (Sẽ mất vài giây)';
+    
+    try {
+        const rootId = ROOT_FOLDER_ID;
+        
+        // 1. Lấy danh sách thư mục con (Albums)
+        const qFolders = `'${rootId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+        const folderResp = await gapi.client.drive.files.list({ q: qFolders, fields: 'files(id, name)', pageSize: 1000 });
+        const folders = folderResp.result.files || [];
+        
+        let newAlbums = [];
+        let newFiles = [];
+        
+        console.log(`Tìm thấy ${folders.length} thư mục.`);
+
+        for (const folder of folders) {
+            // 2. Lấy ảnh trong từng thư mục
+            const qFiles = `'${folder.id}' in parents and (mimeType contains 'image/' or mimeType contains 'video/') and trashed = false`;
+            const fileResp = await gapi.client.drive.files.list({ q: qFiles, fields: 'files(id, name, webContentLink, thumbnailLink, size, createdTime)', pageSize: 1000 });
+            const files = fileResp.result.files || [];
+            
+            // Tạo object Album
+            const album = {
+                id: folder.id, // Dùng luôn ID Drive làm ID Album
+                name: folder.name,
+                createdAt: new Date().toISOString(),
+                driveFolderId: folder.id,
+                fileCount: files.length
+            };
+            newAlbums.push(album);
+            
+            // Tạo object Files
+            for (const f of files) {
+                newFiles.push({
+                    id: f.id,
+                    albumId: album.id,
+                    driveId: f.id,
+                    url: f.webContentLink ? f.webContentLink.replace('&export=download', '') : '',
+                    name: f.name,
+                    type: 'image/jpeg',
+                    uploadedAt: f.createdTime,
+                    thumbnail: f.thumbnailLink
+                });
+            }
+        }
+        
+        // Cập nhật Cache và Lưu vào JSON
+        albumsCache = newAlbums;
+        filesCache = newFiles;
+        
+        await driveStorageManager.setAlbums(newAlbums);
+        await driveStorageManager.setFiles(newFiles);
+        
+        alert(`Đã đồng bộ thành công!\nTìm thấy: ${newAlbums.length} album và ${newFiles.length} file.`);
+        loadAlbums();
+        
+    } catch (e) {
+        console.error(e);
+        alert('Lỗi đồng bộ: ' + e.message);
+        if(btn) btn.textContent = '🔄 Thử lại';
     }
 }
 
@@ -1212,8 +1286,7 @@ async function uploadFiles() {
             await getDriveToken();
         }
 
-        const rootFolderId = await getOrCreateDriveFolder(DRIVE_FOLDER_NAME);
-        if (!rootFolderId) throw new Error("Could not find or create root folder 'AlbumMemory'");
+        const rootFolderId = ROOT_FOLDER_ID;
 
         // Create or get album from localStorage
         let finalAlbumId = albumIdToUse;
