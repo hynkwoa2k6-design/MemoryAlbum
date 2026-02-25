@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Album</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .album-card {
+            position: relative;
+        }
+
+        .album-delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            background-color: rgba(211, 47, 47, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .album-card:hover .album-delete-btn {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <h1 class="logo">Memory Album</h1>
+            <div class="nav-buttons">
+                <button id="loginBtn" class="btn btn-secondary" onclick="openLoginModal()">Admin</button>
+                <div id="userSection" style="display:none; text-align: right;">
+                    <span id="userEmail" class="user-info"></span>
+                    <button class="btn btn-secondary" onclick="logout()"
+                        style="padding: 6px 14px; font-size: 12px; margin-top: 4px;">Sign Out</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Auth Modal -->
+        <div id="authModal" class="modal hidden">
+            <div class="modal-content">
+                <button class="close-btn" onclick="closeLoginModal()">&times;</button>
+
+                <!-- Login Form -->
+                <form id="loginForm" class="auth-form active">
+                    <h2>Admin Login</h2>
+                    <input type="text" id="loginUsername" placeholder="Username" required>
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary full-width">Sign In</button>
+                    <p id="loginError" class="error"></p>
+                </form>
+            </div>
+        </div>
+
+        <div id="mainContent" class="main-content">
+            <section id="albumSection" class="album-section">
+                <h2>YOUR ALBUMS</h2>
+                <div id="albumList" class="album-grid"></div>
+            </section>
+
+            <section id="filesSection" class="files-section hidden">
+                <div class="files-section-header">
+                    <button class="btn btn-secondary" onclick="goBackToAlbums()"
+                        style="padding: 10px; border-radius: 50%; width: 44px; height: 44px;">←</button>
+                    <h2 id="albumTitle" style="font-size: 24px; font-weight: 800; color: #fff;"></h2>
+                </div>
+                <div id="filesList" class="files-grid"></div>
+            </section>
+        </div>
+
+        <!-- Upload Modal -->
+        <div id="uploadModal" class="modal hidden">
+            <div class="modal-content">
+                <button class="close-btn" onclick="closeUploadModal()">&times;</button>
+                <h2 id="uploadModalTitle" style="font-size: 24px; font-weight: 800; margin-bottom: 20px;">Post something
+                </h2>
+
+                <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)"
+                    onclick="document.getElementById('fileInput').click()">
+                    <p style="color: #666;">Tap to pick photos/videos</p>
+                    <input type="file" id="fileInput" multiple accept="image/*,video/*" hidden>
+                    <div id="selectedFilesPreview" class="selected-files-preview"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="albumSelect" style="font-size: 13px; color: #888;">Chọn album hoặc tạo mới</label>
+                    <select id="albumSelect" class="album-select-input">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <input type="text" id="newAlbumName" placeholder="Tên album mới..." style="display: none;">
+                <textarea id="description" placeholder="Add a caption..."></textarea>
+
+                <button class="btn btn-primary full-width" onclick="uploadFiles()">Post Now</button>
+
+                <div id="uploadStatus"></div>
+
+                <div style="margin-top: 24px; text-align: center;">
+                    <button class="btn btn-secondary" onclick="clearDriveAuth()"
+                        style="font-size: 11px; padding: 4px 10px;">Reset Connection</button>
+                </div>
+            </div>
+        </div>
+
+        <button id="fabBtn" class="fab-btn" onclick="openUploadModal()">+</button>
+    </div>
+
+    <!-- Google APIs for Drive -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+
+    <!-- App Script -->
+    <script src="script.js?v=1.1"></script>
+</body>
+
+</html>
