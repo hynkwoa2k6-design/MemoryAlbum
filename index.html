@@ -1,132 +1,268 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memory Album</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Memory Album - dzelg5o4n</title>
     <style>
-        .album-card {
-            position: relative;
+        :root {
+            --primary: #FFFC00;
+            --bg: #000000;
+            --card-bg: #1C1C1E;
+            --input-bg: #2C2C2E;
+            --text: #FFFFFF;
+            --text-dim: #8E8E93;
+            --danger: #FF3B30;
+            --radius: 28px;
         }
 
-        .album-delete-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 10;
-            background-color: rgba(211, 47, 47, 0.8);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
+        body { font-family: -apple-system, system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; -webkit-tap-highlight-color: transparent; }
+        .container { max-width: 500px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+
+        /* Header */
+        .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 5px; }
+        .logo { font-size: 26px; font-weight: 900; letter-spacing: -1px; }
+        .admin-badge { background: #333; color: var(--primary); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+
+        /* Album Grid */
+        .album-grid, .files-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+        .album-card { 
+            background: var(--card-bg); border-radius: var(--radius); height: 230px; 
+            display: flex; align-items: flex-end; padding: 18px; cursor: pointer; 
+            position: relative; overflow: hidden; background-size: cover; background-position: center;
+        }
+        .album-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); }
+        .album-card h3 { z-index: 2; margin: 0; font-size: 17px; }
+
+        /* Media Items */
+        .media-item { position: relative; border-radius: var(--radius); overflow: hidden; background: #111; }
+        .media-item img, .media-item video { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; cursor: zoom-in; }
+        
+        /* Nút Tải về (Nhỏ gọn ở góc) */
+        .btn-download-small {
+            position: absolute; bottom: 10px; right: 10px; z-index: 5;
+            background: rgba(0,0,0,0.5); color: #fff; border: none;
+            width: 32px; height: 32px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(5px);
             font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
         }
 
-        .album-card:hover .album-delete-btn {
-            opacity: 1;
+        /* Admin Tools */
+        .admin-top-tools { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; z-index: 6; }
+        .btn-mini { border: none; padding: 5px 10px; border-radius: 10px; font-size: 9px; font-weight: 800; cursor: pointer; }
+        .btn-cover { background: var(--primary); color: #000; }
+        .btn-delete { background: var(--danger); color: #fff; }
+
+        /* --- LIGHTBOX (PHÓNG TO) --- */
+        #lightbox {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+            z-index: 200; display: none; align-items: center; justify-content: center;
+            cursor: zoom-out; animation: fadeIn 0.2s;
         }
+        #lightbox img, #lightbox video { max-width: 95%; max-height: 80vh; border-radius: 15px; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Modal hệ thống */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: flex-end; backdrop-filter: blur(10px); }
+        .modal-content { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; padding: 25px; box-sizing: border-box; }
+        .hidden { display: none !important; }
+
+        input, select, textarea { width: 100%; padding: 16px; margin: 8px 0; border-radius: 15px; border: none; background: var(--input-bg); color: #fff; font-size: 16px; box-sizing: border-box; }
+        .btn { padding: 16px; border-radius: 20px; border: none; font-weight: 800; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-secondary { background: #333; color: #fff; }
+
+        .fab-btn { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); width: 70px; height: 70px; border-radius: 50%; background: var(--primary); color: #000; font-size: 40px; border: none; cursor: pointer; z-index: 99; box-shadow: 0 5px 20px rgba(255,252,0,0.3); }
     </style>
 </head>
-
 <body>
-    <div class="container">
-        <!-- Navigation -->
-        <nav class="navbar">
-            <h1 class="logo">Memory Album</h1>
-            <div class="nav-buttons">
-                <button id="loginBtn" class="btn btn-secondary" onclick="openLoginModal()">Admin</button>
-                <div id="userSection" style="display:none; text-align: right;">
-                    <span id="userEmail" class="user-info"></span>
-                    <button class="btn btn-secondary" onclick="logout()"
-                        style="padding: 6px 14px; font-size: 12px; margin-top: 4px;">Sign Out</button>
-                </div>
-            </div>
-        </nav>
 
-        <!-- Auth Modal -->
-        <div id="authModal" class="modal hidden">
-            <div class="modal-content">
-                <button class="close-btn" onclick="closeLoginModal()">&times;</button>
-
-                <!-- Login Form -->
-                <form id="loginForm" class="auth-form active">
-                    <h2>Admin Login</h2>
-                    <input type="text" id="loginUsername" placeholder="Username" required>
-                    <input type="password" id="loginPassword" placeholder="Password" required>
-                    <button type="submit" class="btn btn-primary full-width">Sign In</button>
-                    <p id="loginError" class="error"></p>
-                </form>
-            </div>
+<div class="container">
+    <nav class="navbar">
+        <h1 class="logo">Locket.</h1>
+        <div id="authSection">
+            <button id="loginBtn" style="background:none; color:var(--text-dim); border:none; font-weight:bold; cursor:pointer;" onclick="document.getElementById('authModal').classList.remove('hidden')">Admin</button>
+            <div id="adminBadge" class="admin-badge hidden">ADMIN MODE</div>
         </div>
+    </nav>
 
-        <div id="mainContent" class="main-content">
-            <section id="albumSection" class="album-section">
-                <h2>YOUR ALBUMS</h2>
-                <div id="albumList" class="album-grid"></div>
-            </section>
+    <section id="albumSection">
+        <p style="font-size: 11px; color: var(--text-dim); font-weight: 700; margin-left: 5px;">ALBUMS</p>
+        <div id="albumList" class="album-grid"></div>
+    </section>
 
-            <section id="filesSection" class="files-section hidden">
-                <div class="files-section-header">
-                    <button class="btn btn-secondary" onclick="goBackToAlbums()"
-                        style="padding: 10px; border-radius: 50%; width: 44px; height: 44px;">←</button>
-                    <h2 id="albumTitle" style="font-size: 24px; font-weight: 800; color: #fff;"></h2>
-                </div>
-                <div id="filesList" class="files-grid"></div>
-            </section>
+    <section id="filesSection" class="hidden">
+        <div style="display:flex; align-items:center; gap:15px; margin-bottom: 20px;">
+            <button onclick="goBackToAlbums()" style="background:var(--input-bg); color:#fff; border:none; border-radius:50%; width:40px; height:40px; cursor:pointer;">←</button>
+            <h2 id="albumTitle" style="margin:0; font-weight:800;"></h2>
         </div>
+        <div id="filesList" class="files-grid"></div>
+    </section>
 
-        <!-- Upload Modal -->
-        <div id="uploadModal" class="modal hidden">
-            <div class="modal-content">
-                <button class="close-btn" onclick="closeUploadModal()">&times;</button>
-                <h2 id="uploadModalTitle" style="font-size: 24px; font-weight: 800; margin-bottom: 20px;">Post something
-                </h2>
-
-                <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)"
-                    onclick="document.getElementById('fileInput').click()">
-                    <p style="color: #666;">Tap to pick photos/videos</p>
-                    <input type="file" id="fileInput" multiple accept="image/*,video/*" hidden>
-                    <div id="selectedFilesPreview" class="selected-files-preview"></div>
-                </div>
-
-                <div class="form-group">
-                    <label for="albumSelect" style="font-size: 13px; color: #888;">Chọn album hoặc tạo mới</label>
-                    <select id="albumSelect" class="album-select-input">
-                        <!-- Populated by JS -->
-                    </select>
-                </div>
-                <input type="text" id="newAlbumName" placeholder="Tên album mới..." style="display: none;">
-                <textarea id="description" placeholder="Add a caption..."></textarea>
-
-                <button class="btn btn-primary full-width" onclick="uploadFiles()">Post Now</button>
-
-                <div id="uploadStatus"></div>
-
-                <div style="margin-top: 24px; text-align: center;">
-                    <button class="btn btn-secondary" onclick="clearDriveAuth()"
-                        style="font-size: 11px; padding: 4px 10px;">Reset Connection</button>
-                </div>
-            </div>
-        </div>
-
-        <button id="fabBtn" class="fab-btn" onclick="openUploadModal()">+</button>
+    <div id="lightbox" onclick="this.style.display='none'">
+        <div id="lightboxContent"></div>
     </div>
 
-    <!-- Google APIs for Drive -->
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client"></script>
+    <div id="authModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 style="margin:0 0 10px 0;">Admin Access</h2>
+            <input type="text" id="adminUser" placeholder="User">
+            <input type="password" id="adminPass" placeholder="Pass">
+            <button class="btn btn-primary" onclick="handleLogin()">Xác nhận</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('authModal').classList.add('hidden')">Hủy</button>
+        </div>
+    </div>
 
-    <!-- App Script -->
-    <script src="script.js?v=1.1"></script>
+    <div id="uploadModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 style="margin:0 0 10px 0;">Đăng khoảnh khắc</h2>
+            <input type="file" id="fileInput" multiple accept="image/*,video/*">
+            <select id="albumSelect" onchange="document.getElementById('newAlbumInput').classList.toggle('hidden', this.value !== 'NEW')">
+                <option value="Chung">Chọn Album</option>
+                <option value="NEW">+ Album mới...</option>
+            </select>
+            <input type="text" id="newAlbumInput" placeholder="Tên album mới..." class="hidden">
+            <button class="btn btn-primary" onclick="uploadFiles()">Đăng ngay</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('uploadModal').classList.add('hidden')">Hủy</button>
+            <div id="uploadStatus" style="text-align:center; margin-top:10px;"></div>
+        </div>
+    </div>
+
+    <button class="fab-btn" onclick="document.getElementById('uploadModal').classList.remove('hidden')">+</button>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, where, updateDoc, doc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBaQWAs3E65p07KuuksVpdfTYYEsYMpwhU",
+        authDomain: "album-memory-71a3f.firebaseapp.com",
+        projectId: "album-memory-71a3f",
+        storageBucket: "album-memory-71a3f.firebasestorage.app",
+        messagingSenderId: "831264641769",
+        appId: "1:831264641769:web:be5ec7dda924ab72449678"
+    };
+    const CLOUD_NAME = "dzelg5o4n", UPLOAD_PRESET = "my_album";
+    const app = initializeApp(firebaseConfig), db = getFirestore(app);
+    let isAdmin = false;
+
+    window.handleLogin = () => {
+        if(document.getElementById('adminUser').value === 'admin' && document.getElementById('adminPass').value === 'van1508') {
+            isAdmin = true;
+            document.getElementById('adminBadge').classList.remove('hidden');
+            document.getElementById('loginBtn').classList.add('hidden');
+            document.getElementById('authModal').classList.add('hidden');
+            renderAlbums();
+        } else alert("Sai thông tin!");
+    };
+
+    window.goBackToAlbums = () => {
+        document.getElementById('albumSection').classList.remove('hidden');
+        document.getElementById('filesSection').classList.add('hidden');
+    };
+
+    // Phóng to ảnh
+    window.zoomMedia = (url, type) => {
+        const lb = document.getElementById('lightbox');
+        const content = document.getElementById('lightboxContent');
+        content.innerHTML = type.includes('video') ? `<video src="${url}" controls autoplay></video>` : `<img src="${url}">`;
+        lb.style.display = 'flex';
+    };
+
+    // Tải về
+    window.downloadMedia = async (url, e) => {
+        e.stopPropagation(); // Không cho kích hoạt zoom khi bấm tải
+        try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'locket-memory.jpg';
+            a.click();
+        } catch(e) { window.open(url, '_blank'); }
+    };
+
+    window.deletePhoto = async (id, e) => {
+        e.stopPropagation();
+        if(confirm("Xóa ảnh này?")) await deleteDoc(doc(db, "media", id));
+    };
+
+    window.setCover = async (id, album, e) => {
+        e.stopPropagation();
+        const q = query(collection(db, "media"), where("album", "==", album), where("isCover", "==", true));
+        const old = await getDocs(q);
+        for(let d of old.docs) await updateDoc(doc(db, "media", d.id), {isCover: false});
+        await updateDoc(doc(db, "media", id), {isCover: true});
+        alert("Đã đổi ảnh bìa!");
+    };
+
+    function renderAlbums() {
+        onSnapshot(query(collection(db, "media"), orderBy("createdAt", "desc")), (snapshot) => {
+            const list = document.getElementById('albumList'), select = document.getElementById('albumSelect');
+            const albumsMap = new Map();
+            snapshot.forEach(d => {
+                const data = d.data();
+                if (!albumsMap.has(data.album)) albumsMap.set(data.album, { items: [], cover: null });
+                albumsMap.get(data.album).items.push(data.url);
+                if (data.isCover) albumsMap.get(data.album).cover = data.url;
+            });
+            list.innerHTML = "";
+            select.innerHTML = '<option value="Chung">Chọn Album</option><option value="NEW">+ Album mới...</option>';
+            albumsMap.forEach((info, name) => {
+                const card = document.createElement('div');
+                card.className = 'album-card';
+                card.style.backgroundImage = `url('${info.cover || info.items[0]}')`;
+                card.innerHTML = `<h3>${name}</h3>`;
+                card.onclick = () => viewAlbum(name);
+                list.appendChild(card);
+                select.innerHTML += `<option value="${name}">${name}</option>`;
+            });
+        });
+    }
+    renderAlbums();
+
+    window.viewAlbum = (name) => {
+        document.getElementById('albumSection').classList.add('hidden');
+        document.getElementById('filesSection').classList.remove('hidden');
+        document.getElementById('albumTitle').innerText = name;
+        onSnapshot(query(collection(db, "media"), where("album", "==", name), orderBy("createdAt", "desc")), (snapshot) => {
+            const flist = document.getElementById('filesList');
+            flist.innerHTML = "";
+            snapshot.forEach(d => {
+                const data = d.data(), div = document.createElement('div');
+                div.className = "media-item";
+                div.onclick = () => zoomMedia(data.url, data.type);
+                
+                let media = data.type.includes('video') ? `<video src="${data.url}"></video>` : `<img src="${data.url}">`;
+                let dlBtn = `<button class="btn-download-small" onclick="downloadMedia('${data.url}', event)">⬇</button>`;
+                let adminBtns = isAdmin ? `<div class="admin-top-tools">
+                    <button class="btn-mini btn-cover" onclick="setCover('${d.id}', '${name}', event)">BÌA</button>
+                    <button class="btn-mini btn-delete" onclick="deletePhoto('${d.id}', event)">×</button>
+                </div>` : "";
+                
+                div.innerHTML = media + dlBtn + adminBtns;
+                flist.appendChild(div);
+            });
+        });
+    };
+
+    window.uploadFiles = async () => {
+        const files = document.getElementById('fileInput').files;
+        let album = document.getElementById('albumSelect').value;
+        if(album === 'NEW') album = document.getElementById('newAlbumInput').value;
+        if(!files.length || !album) return alert("Hòa ơi chọn ảnh đã!");
+        document.getElementById('uploadStatus').innerText = "🚀 Đang gửi...";
+        for(let f of files) {
+            const fd = new FormData();
+            fd.append('file', f); fd.append('upload_preset', UPLOAD_PRESET);
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, { method: "POST", body: fd });
+            const d = await res.json();
+            await addDoc(collection(db, "media"), { url: d.secure_url, type: f.type, album, createdAt: new Date(), isCover: false });
+        }
+        document.getElementById('uploadStatus').innerText = "✨ Xong!";
+        setTimeout(() => { document.getElementById('uploadModal').classList.add('hidden'); document.getElementById('uploadStatus').innerText=""; }, 1000);
+    };
+</script>
 </body>
-
 </html>
