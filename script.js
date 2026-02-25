@@ -53,7 +53,7 @@ const driveStorageManager = {
                     console.log('Loaded public files metadata');
                 }
             }
-            if (albumsCache && filesCache) {
+            if ((PUBLIC_ALBUMS_FILE_ID || PUBLIC_FILES_FILE_ID) && albumsCache && filesCache) {
                 // both loaded
                     console.log('Drive (public) data loaded successfully');
                     console.log('albumsCache:', albumsCache);
