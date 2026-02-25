@@ -7,8 +7,8 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const DRIVE_FOLDER_NAME = "AlbumMemory";
 const ROOT_FOLDER_ID = "16iD_6EcWv2XYTtyiYAJZmHbJX2rFyljO"; // ID thư mục Drive của bạn
 // Optional: public metadata file IDs (make these files "Anyone with the link -> Viewer")
-const PUBLIC_ALBUMS_FILE_ID = null; // e.g. '1AbCd...'
-const PUBLIC_FILES_FILE_ID = null; // e.g. '1XyZ...'
+const PUBLIC_ALBUMS_FILE_ID = "1V610yMBiZIAH76Rrp9KUwv_Q7e-lb_1E"; // e.g. '1AbCd...'
+const PUBLIC_FILES_FILE_ID = "1RNIA3ZZYCS7IbEcIzSkntw5AzH2m_9Y_"; // e.g. '1XyZ...'
 const ALBUMS_DATA_FILE = "albums_data.json";
 const FILES_DATA_FILE = "files_data.json";
 
