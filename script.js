@@ -54,7 +54,9 @@ const driveStorageManager = {
             }
             if (albumsCache && filesCache) {
                 // both loaded
-                console.log('Drive (public) data loaded successfully');
+                    console.log('Drive (public) data loaded successfully');
+                    console.log('albumsCache:', albumsCache);
+                    console.log('filesCache:', filesCache);
                 return;
             }
         } catch (e) {
@@ -83,6 +85,8 @@ const driveStorageManager = {
             if (!Array.isArray(filesCache)) filesCache = [];
             
             console.log("Drive data loaded successfully (authenticated)");
+            console.log('albumsCache:', albumsCache);
+            console.log('filesCache:', filesCache);
         } catch (error) {
             console.error("Error loading Drive data:", error);
         }
@@ -587,6 +591,7 @@ async function loadAlbums() {
 
     try {
         const albums = storageManager.getAlbums();
+        console.log('loadAlbums() albums:', albums);
         albumList.innerHTML = '';
 
         if (!albums || albums.length === 0) {
@@ -743,6 +748,7 @@ async function loadFiles(albumId) {
 
     try {
         const albumFiles = storageManager.getFilesByAlbumId(albumId);
+        console.log('loadFiles() albumId:', albumId, 'files:', albumFiles);
         filesList.innerHTML = '';
 
         if (!albumFiles || albumFiles.length === 0) {
@@ -993,17 +999,20 @@ async function uploadToDrive(file, folderId) {
                 },
                 body: JSON.stringify({ role: 'reader', type: 'anyone' })
             });
+            console.log('Fallback permission create succeeded for file', result.id);
         } catch (e2) {
             console.error('Fallback permission create failed:', e2);
         }
     }
 
     // Normalize returned object with convenient links
-    return {
+    const normalized = {
         id: result.id,
         webContentLink: result.webContentLink || `https://drive.google.com/uc?export=view&id=${result.id}`,
         thumbnailLink: result.thumbnailLink || null
     };
+    console.log('File saved to Drive:', normalized);
+    return normalized;
 }
 
 async function uploadFiles() {
