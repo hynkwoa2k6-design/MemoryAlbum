@@ -5,6 +5,9 @@
 const GOOGLE_CLIENT_ID = "831264641769-anqogj5ov2mdmarq5in18naunfkspd6a.apps.googleusercontent.com"; 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_FOLDER_NAME = "AlbumMemory";
+// Optional: public metadata file IDs (make these files "Anyone with the link -> Viewer")
+const PUBLIC_ALBUMS_FILE_ID = null; // e.g. '1AbCd...'
+const PUBLIC_FILES_FILE_ID = null; // e.g. '1XyZ...'
 const ALBUMS_DATA_FILE = "albums_data.json";
 const FILES_DATA_FILE = "files_data.json";
 
@@ -29,11 +32,41 @@ let filesDataFileId = null;
 const driveStorageManager = {
     // Load all data from Google Drive
     loadAll: async () => {
+        // Try public metadata fetch first (no auth required)
+        try {
+            if (PUBLIC_ALBUMS_FILE_ID) {
+                console.log('Attempting to load public albums metadata from file id', PUBLIC_ALBUMS_FILE_ID);
+                const resp = await fetch(`https://drive.google.com/uc?export=download&id=${PUBLIC_ALBUMS_FILE_ID}`);
+                if (resp.ok) {
+                    const text = await resp.text();
+                    try { albumsCache = JSON.parse(text); } catch(e) { albumsCache = []; }
+                    console.log('Loaded public albums metadata');
+                }
+            }
+            if (PUBLIC_FILES_FILE_ID) {
+                console.log('Attempting to load public files metadata from file id', PUBLIC_FILES_FILE_ID);
+                const resp = await fetch(`https://drive.google.com/uc?export=download&id=${PUBLIC_FILES_FILE_ID}`);
+                if (resp.ok) {
+                    const text = await resp.text();
+                    try { filesCache = JSON.parse(text); } catch(e) { filesCache = []; }
+                    console.log('Loaded public files metadata');
+                }
+            }
+            if (albumsCache && filesCache) {
+                // both loaded
+                console.log('Drive (public) data loaded successfully');
+                return;
+            }
+        } catch (e) {
+            console.warn('Public metadata fetch failed or not configured:', e);
+        }
+
+        // Fallback: use authenticated Drive access (requires token)
         if (!driveAccessToken) {
-            console.warn("No Drive token, using empty data");
+            console.warn("No Drive token, skipping authenticated load");
             return;
         }
-        
+
         try {
             const rootFolderId = await getOrCreateDriveFolder(DRIVE_FOLDER_NAME);
             
@@ -49,7 +82,7 @@ const driveStorageManager = {
             filesCache = await driveStorageManager.readFile(filesFile.id);
             if (!Array.isArray(filesCache)) filesCache = [];
             
-            console.log("Drive data loaded successfully");
+            console.log("Drive data loaded successfully (authenticated)");
         } catch (error) {
             console.error("Error loading Drive data:", error);
         }
