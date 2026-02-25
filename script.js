@@ -570,6 +570,133 @@ function logout() {
     loadAlbums(); // Reload to hide delete buttons
 }
 
+// ============================================
+// ADMIN PANEL: PUBLIC METADATA SETUP
+// ============================================
+
+async function createPublicMetadataFiles() {
+    // Admin only function to create public metadata files on Drive
+    if (!isAdmin) {
+        alert("Only admin can use this feature");
+        return;
+    }
+    if (!driveAccessToken) {
+        alert("Please sign in with Google Drive first");
+        return;
+    }
+
+    try {
+        // Get or create AlbumMemory folder
+        const rootFolderId = await getOrCreateDriveFolder(DRIVE_FOLDER_NAME);
+        console.log("Root folder ID:", rootFolderId);
+
+        // Create/update albums_data.json
+        console.log("Creating public albums metadata file...");
+        const albumsBlob = new Blob([JSON.stringify(albumsCache, null, 2)], { type: "application/json" });
+        const albumsFile = await uploadPublicFile("albums_data.json", albumsBlob, rootFolderId);
+        const albumsFileId = albumsFile.id;
+        console.log("Albums file created/updated:", albumsFileId);
+
+        // Create/update files_data.json
+        console.log("Creating public files metadata file...");
+        const filesBlob = new Blob([JSON.stringify(filesCache, null, 2)], { type: "application/json" });
+        const filesFile = await uploadPublicFile("files_data.json", filesBlob, rootFolderId);
+        const filesFileId = filesFile.id;
+        console.log("Files file created/updated:", filesFileId);
+
+        // Save to sessionStorage for reuse
+        sessionStorage.setItem("PUBLIC_ALBUMS_FILE_ID", albumsFileId);
+        sessionStorage.setItem("PUBLIC_FILES_FILE_ID", filesFileId);
+
+        // Also log for copy-paste to code
+        const configSnippet = `
+const PUBLIC_ALBUMS_FILE_ID = '${albumsFileId}';
+const PUBLIC_FILES_FILE_ID = '${filesFileId}';
+        `;
+        console.log("✅ Public metadata files created successfully!");
+        console.log("Copy this into script.js constant definitions if you want these to be default:");
+        console.log(configSnippet);
+
+        alert(`✅ Public metadata files created!\n\nAlbums File ID:\n${albumsFileId}\n\nFiles File ID:\n${filesFileId}\n\nThese IDs are now saved for this session.\n\nTo make them permanent, copy the config from console and update script.js`);
+    } catch (error) {
+        console.error("Error creating public metadata files:", error);
+        alert("❌ Error creating public files: " + error.message);
+    }
+}
+
+async function uploadPublicFile(fileName, blob, parentFolderId) {
+    // Check if file exists, delete it if so, then upload new one
+    const query = `name = '${fileName}' and mimeType = 'application/json' and '${parentFolderId}' in parents and trashed = false`;
+    const listResp = await gapi.client.drive.files.list({
+        q: query,
+        spaces: 'drive',
+        fields: 'files(id)'
+    });
+
+    if (listResp.result.files && listResp.result.files.length > 0) {
+        // File exists, update it
+        const existingFileId = listResp.result.files[0].id;
+        console.log(`File ${fileName} exists, updating...`);
+        await gapi.client.drive.files.update({
+            fileId: existingFileId,
+            media: {
+                mimeType: 'application/json',
+                body: blob
+            }
+        });
+        return { id: existingFileId };
+    }
+
+    // File doesn't exist, create it
+    console.log(`File ${fileName} doesn't exist, creating...`);
+    const metadata = {
+        name: fileName,
+        mimeType: 'application/json',
+        parents: [parentFolderId]
+    };
+
+    const createResp = await gapi.client.drive.files.create({
+        resource: metadata,
+        media: {
+            mimeType: 'application/json',
+            body: blob
+        },
+        fields: 'id'
+    });
+
+    const fileId = createResp.result.id;
+
+    // Set permission to "anyone with link"
+    console.log(`Setting permission for ${fileName}...`);
+    try {
+        await gapi.client.drive.permissions.create({
+            fileId: fileId,
+            resource: {
+                role: 'reader',
+                type: 'anyone'
+            }
+        });
+        console.log(`Permission set for ${fileName}`);
+    } catch (e) {
+        console.warn(`Could not set public permission via gapi for ${fileName}, trying REST API...`);
+        try {
+            await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+                method: 'POST',
+                headers: {
+                    Authorization: 'Bearer ' + driveAccessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ role: 'reader', type: 'anyone' })
+            });
+            console.log(`Permission set for ${fileName} via REST`);
+        } catch (e2) {
+            console.error(`Failed to set permission for ${fileName}:`, e2);
+        }
+    }
+
+    return { id: fileId };
+}
+
 // Listen for album selection changes
 document.getElementById('albumSelect').addEventListener('change', e => {
     const newAlbumInput = document.getElementById('newAlbumName');
@@ -585,6 +712,21 @@ document.getElementById('albumSelect').addEventListener('change', e => {
 // ALBUM FUNCTIONS
 // ============================================
 
+async function connectAndLoad() {
+    const btn = document.getElementById('connectDriveBtn');
+    if (btn) btn.textContent = '⏳ Đang kết nối...';
+
+    try {
+        await getDriveToken();
+        await driveStorageManager.loadAll();
+        loadAlbums();
+    } catch (e) {
+        console.error(e);
+        alert("Lỗi kết nối: " + (e.message || JSON.stringify(e)));
+        if (btn) btn.textContent = '🔄 Thử lại kết nối';
+    }
+}
+
 async function loadAlbums() {
     const albumList = document.getElementById('albumList');
     albumList.innerHTML = '<p>Đang tải albums...</p>';
@@ -595,7 +737,17 @@ async function loadAlbums() {
         albumList.innerHTML = '';
 
         if (!albums || albums.length === 0) {
-            albumList.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999;">Chưa có album nào. Hãy tạo album đầu tiên!</p>';
+            if (!driveAccessToken) {
+                albumList.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; color: #999; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                        <p>Chưa kết nối với Google Drive.</p>
+                        <button id="connectDriveBtn" class="btn btn-primary" onclick="connectAndLoad()">🔄 Kết nối Google Drive để tải Album</button>
+                        <p style="font-size: 12px; color: #666;">(Cần cấp quyền để xem ảnh/video của bạn)</p>
+                    </div>
+                `;
+            } else {
+                albumList.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999;">Chưa có album nào. Hãy tạo album đầu tiên!</p>';
+            }
             return;
         }
 
