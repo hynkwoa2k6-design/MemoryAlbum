@@ -53,7 +53,9 @@ const driveStorageManager = {
                     console.log('Loaded public files metadata');
                 }
             }
-            if ((PUBLIC_ALBUMS_FILE_ID || PUBLIC_FILES_FILE_ID) && albumsCache && filesCache) {
+            // Chỉ return sớm nếu thực sự có cấu hình Public ID
+            const hasPublicConfig = (PUBLIC_ALBUMS_FILE_ID || PUBLIC_FILES_FILE_ID);
+            if (hasPublicConfig && albumsCache && filesCache) {
                 // both loaded
                     console.log('Drive (public) data loaded successfully');
                     console.log('albumsCache:', albumsCache);
@@ -861,7 +863,31 @@ async function syncDriveData() {
         await driveStorageManager.setAlbums(newAlbums);
         await driveStorageManager.setFiles(newFiles);
         
-        alert(`Đã đồng bộ thành công!\nTìm thấy: ${newAlbums.length} album và ${newFiles.length} file.`);
+        // --- MỚI: Tự động public file và hiện ID để cấu hình ---
+        if (btn) btn.textContent = '🔓 Đang public dữ liệu...';
+        
+        // Hàm phụ để set quyền public
+        const makePublic = async (fileId) => {
+            try {
+                await gapi.client.drive.permissions.create({
+                    fileId: fileId,
+                    resource: { role: 'reader', type: 'anyone' }
+                });
+            } catch (e) { console.warn('Lỗi set public (có thể đã public rồi):', e); }
+        };
+
+        if (albumsDataFileId) await makePublic(albumsDataFileId);
+        if (filesDataFileId) await makePublic(filesDataFileId);
+
+        const configCode = `const PUBLIC_ALBUMS_FILE_ID = "${albumsDataFileId}";\nconst PUBLIC_FILES_FILE_ID = "${filesDataFileId}";`;
+        
+        console.log("--- COPY ĐOẠN DƯỚI ĐÂY VÀO ĐẦU FILE SCRIPT.JS ---");
+        console.log(configCode);
+        console.log("-------------------------------------------------");
+
+        alert(`✅ Đã đồng bộ và Public thành công!\n\nĐể web tự chạy mà KHÔNG CẦN ĐĂNG NHẬP, hãy copy đoạn mã tôi vừa hiện trong bảng (hoặc Console F12) và dán thay thế vào dòng 10-11 của file script.js`);
+        prompt("Copy đoạn này thay vào dòng 10-11 của script.js:", configCode);
+        
         loadAlbums();
         
     } catch (e) {
