@@ -97,15 +97,51 @@ const driveStorageManager = {
     // Read file content from Drive
     readFile: async (fileId) => {
         try {
+            // Try using gapi client first
             const response = await gapi.client.drive.files.get({
                 fileId: fileId,
                 alt: 'media'
             });
-            const data = response.result;
-            return typeof data === 'string' ? JSON.parse(data) : data;
+
+            // gapi may return media in response.body or response.result
+            const body = response.body || response.result || response;
+            if (typeof body === 'string') {
+                try {
+                    return JSON.parse(body);
+                } catch (e) {
+                    console.warn('Could not parse Drive file as JSON via gapi, returning raw:', e);
+                    return body;
+                }
+            }
+            return body;
         } catch (error) {
-            console.error("Error reading file from Drive:", error);
-            return [];
+            console.warn("gapi readFile failed, trying REST fetch fallback:", error);
+            // Fallback: use REST API with fetch and Bearer token (requires driveAccessToken)
+            if (!driveAccessToken) {
+                console.error('No driveAccessToken available for fetch fallback');
+                return [];
+            }
+            try {
+                const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                    headers: {
+                        Authorization: 'Bearer ' + driveAccessToken,
+                        Accept: 'application/json'
+                    }
+                });
+                if (!resp.ok) {
+                    console.error('Fetch fallback failed, status:', resp.status, await resp.text());
+                    return [];
+                }
+                const text = await resp.text();
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    return text;
+                }
+            } catch (e) {
+                console.error('Fetch fallback exception while reading file from Drive:', e);
+                return [];
+            }
         }
     },
     
