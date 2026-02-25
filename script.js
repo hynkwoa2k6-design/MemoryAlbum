@@ -774,7 +774,7 @@ async function loadAlbums() {
                     const fileData = albumFiles[0];
                     const thumbUrl = getDriveImageUrl(fileData.driveId);
                     if (thumbUrl) {
-                        thumbnailHtml = `<img src="${thumbUrl}" class="album-thumbnail-img" alt="${album.name}" onerror="this.src='https://via.placeholder.com/300?text=Error'">`;
+                        thumbnailHtml = `<img src="${thumbUrl}" class="album-thumbnail-img" alt="${album.name}" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'album-thumbnail\'>⚠️</div>'">`;
                     }
                 }
             } catch (e) { console.error("Could not load thumbnail", e); }
@@ -879,6 +879,9 @@ async function syncDriveData() {
         if (albumsDataFileId) await makePublic(albumsDataFileId);
         if (filesDataFileId) await makePublic(filesDataFileId);
 
+        // Cập nhật giao diện NGAY LẬP TỨC trước khi hiện thông báo
+        loadAlbums();
+
         const configCode = `const PUBLIC_ALBUMS_FILE_ID = "${albumsDataFileId}";\nconst PUBLIC_FILES_FILE_ID = "${filesDataFileId}";`;
         
         console.log("--- COPY ĐOẠN DƯỚI ĐÂY VÀO ĐẦU FILE SCRIPT.JS ---");
@@ -887,8 +890,6 @@ async function syncDriveData() {
 
         alert(`✅ Đã đồng bộ và Public thành công!\n\nĐể web tự chạy mà KHÔNG CẦN ĐĂNG NHẬP, hãy copy đoạn mã tôi vừa hiện trong bảng (hoặc Console F12) và dán thay thế vào dòng 10-11 của file script.js`);
         prompt("Copy đoạn này thay vào dòng 10-11 của script.js:", configCode);
-        
-        loadAlbums();
         
     } catch (e) {
         console.error(e);
